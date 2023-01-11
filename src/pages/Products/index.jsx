@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Layout from "../../components/Layout/index";
 import { apiProducts } from "../../apis/dashboard/product";
 
@@ -6,40 +6,50 @@ const Index = () => {
   const [products, setProducts] = useState([]);
   const [skip, setSkip] = useState(0);
   const [limit, setLimit] = useState(10);
+  const isFirstCall = useRef(true);
   const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(false);
-  // const getProducts = async () => {
-  //   const response = await apiProducts();
-  //   setProducts(response.data.products);
-  // };
-  async function getProducts(event) {
-    try {
-      let { clientHeight,scrollTop,  scrollHeight } =
-        event.target.scrollingElement;
-      if (
-        !loading &&
-        skip != total &&
-        scrollTop + clientHeight >= (scrollHeight * 4) / 5
-      ) {
-        triggerProducts(skip, limit);
-      }
-    } catch (error) {
-      console.log(error);
-    }
-  }
+ 
   async function triggerProducts(skipNumber, limitNumber) {
-    setLoading(true);
     const response = await apiProducts(skipNumber, limitNumber);
-    setSkip(skipNumber + limitNumber);
-    setLoading(false);
+    setTotal(response.data.total);
+    setSkip((prev) => prev + limitNumber);
     setProducts([...products, ...response.data.products]);
   }
+
   useEffect(() => {
-    window.addEventListener("scroll", (event) => {
-       getProducts(event);
-    });
-     triggerProducts(skip, limit);
-  }, []);
+    if (isFirstCall.current) {
+      triggerProducts(skip, limit);
+      isFirstCall.current = false;
+    }
+  }, [isFirstCall]);
+
+  useEffect(() => {
+    let loading = false;
+
+    const handleScroll = async (event) => {
+      let { clientHeight, scrollTop, scrollHeight } =
+        event.target.scrollingElement;
+
+      if (
+        !loading &&
+        skip !== total &&
+        scrollTop + clientHeight >= (scrollHeight * 4) / 5
+      ) {
+        loading = true;
+
+        await triggerProducts(skip, limit);
+
+        loading = false;
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll);
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, [skip]);
+
   return (
     <>
       <Layout />
@@ -50,7 +60,6 @@ const Index = () => {
               {products &&
                 products.map((product) => (
                   <div
-                  
                     key={product.id}
                     className="w-full justify-center align-center max-w-sm bg-white rounded-lg shadow-md dark:bg-gray-800 dark:border-gray-700"
                   >
